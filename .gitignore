@@ -1,0 +1,8 @@
+venv
+.vscode
+.env
+given.csv
+mentor.csv
+mentee.csv
+state.txt
+rpmsc.log
