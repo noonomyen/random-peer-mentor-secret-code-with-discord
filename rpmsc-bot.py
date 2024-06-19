@@ -30,15 +30,13 @@ class CodeGiven():
         self.log = logging.getLogger("rpmsc.code-given")
         self.data = {}
 
-        tmp = []
-        for row in csv.reader(open("given.csv", "r")):
-            tmp.append(row)
+        self.data_f = open("given.csv", "a+", newline="", encoding="utf-8")
+        self.data_f.seek(0)
+        for row in csv.reader(self.data_f):
             time, _, mentee_std_id, mentee_name, mentor_std_id, mentor_name, mentor_secret_code = row
             self.data[(int(mentee_std_id), mentee_name)] = (datetime.fromisoformat(time), int(mentor_std_id), mentor_name, mentor_secret_code)
 
-        self.data_w = csv.writer(open("given.csv", "w", newline="", encoding="utf-8"), delimiter=",")
-        self.data_w.writerows(tmp)
-        del tmp
+        self.data_w = csv.writer(self.data_f, delimiter=",")
 
         self.log.info(f"Number of mentee code given : {len(self.data)}")
 
