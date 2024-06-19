@@ -1,6 +1,6 @@
 root = true
 
-[*.{py,}]
+[*.{py,gs}]
     insert_final_newline = true
     trim_trailing_whitespace = true
     indent_size = 4

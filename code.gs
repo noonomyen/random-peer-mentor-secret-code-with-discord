@@ -24,10 +24,10 @@ function doPost(e) {
           const sheet = SpreadsheetApp.getActiveSheet();
           sheet.appendRow([item.time, item.mentee_std_id, item.mentee_name, item.mentor_std_id, item.mentor_name, item.message]);
         })
-        
+
         return res_json({ status: "ok" });
       }
-      
+
       return res_json({ status: "bad_request" });
     }
 
