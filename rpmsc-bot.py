@@ -122,7 +122,7 @@ class Client(DiscordClient):
     code_given: CodeGiven
     command_tree: app_commands.CommandTree
 
-    def __init__(self, *, intents: Intents, guild_id: int, code_given_channel_id: int, sheet_api_url: str, **options: Any) -> None:
+    def __init__(self, *, intents: Intents, guild_id: int, sheet_api_url: str, **options: Any) -> None:
         self.log = logging.getLogger("rpmcs.client")
         self.log_on_message = logging.getLogger("rpmcs.client.on_message")
         self.log_on_raw_message_delete = logging.getLogger("rpmcs.client.on_raw_message_delete")
@@ -130,7 +130,6 @@ class Client(DiscordClient):
         super().__init__(intents=intents, **options)
 
         self.guild_id = guild_id
-        self.code_given_channel_id = code_given_channel_id
         self.sheet_api_url = sheet_api_url
         self.resource = Resource()
         self.code_given = CodeGiven()
@@ -257,12 +256,11 @@ if __name__ == "__main__":
 
     bot_token = getenv("DISCORD_RPMSC_TOKEN")
     guild_id = getenv("LISTEN_GUILD_ID")
-    code_given_channel_id = getenv("CODE_GIVEN_CHANNEL_ID")
     sheet_api_url = getenv("SHEET_API_URL")
 
-    if bot_token is None or guild_id is None or code_given_channel_id is None or sheet_api_url is None:
-        print("DISCORD_RPMSC_TOKEN and LISTEN_GUILD_ID and CODE_GIVEN_CHANNEL_ID and SHEET_API_URL is required in env")
+    if bot_token is None or guild_id is None or sheet_api_url is None:
+        print("DISCORD_RPMSC_TOKEN and LISTEN_GUILD_ID and and SHEET_API_URL is required in env")
         exit(1)
 
-    client = Client(intents=Intents.all(), guild_id=int(guild_id), code_given_channel_id=int(code_given_channel_id), sheet_api_url=sheet_api_url, max_messages=None)
+    client = Client(intents=Intents.all(), guild_id=int(guild_id), sheet_api_url=sheet_api_url, max_messages=None)
     client.run(token=bot_token, reconnect=True, log_handler=log_handler)
