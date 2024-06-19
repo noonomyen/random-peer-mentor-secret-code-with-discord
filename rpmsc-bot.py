@@ -4,7 +4,6 @@ from asyncio import Lock
 from typing import Any, Optional
 from random import randint
 from datetime import datetime
-from io import TextIOWrapper
 
 import logging
 import logging.handlers
@@ -25,7 +24,6 @@ log = logging.getLogger("rpmsc")
 
 class CodeGiven():
     log: logging.Logger
-    data_f: TextIOWrapper
     data: dict[tuple[int, str], tuple[datetime, int, str, str]]
     record: list[tuple[str, int, str, int, str, str]]
 
@@ -34,21 +32,18 @@ class CodeGiven():
         self.data = {}
         self.record = []
 
-        self.data_f = open("given.csv", "a+", newline="", encoding="utf-8")
-        self.data_f.seek(0)
-        for row in csv.reader(self.data_f):
+        for row in csv.reader(open("given.csv", "r", newline="", encoding="utf-8")):
             time, _, mentee_std_id, mentee_name, mentor_std_id, mentor_name, mentor_secret_code = row
             self.data[(int(mentee_std_id), mentee_name)] = (datetime.fromisoformat(time), int(mentor_std_id), mentor_name, mentor_secret_code)
-
-        self.data_w = csv.writer(self.data_f, delimiter=",")
 
         self.log.info(f"Number of mentee code given : {len(self.data)}")
 
     def set(self, uid: int, time: datetime, mentee_std_id: int, mentee_name: str, mentor_data: tuple[int, str, str]) -> None:
         self.log.info(f"Set Mentor of {mentee_std_id}:'{mentee_name}' is {mentor_data[0]}:'{mentor_data[1]}'")
+        with open("given.csv", "a", newline="", encoding="utf-8") as f:
+            csv.writer(f, delimiter=",").writerow((time.isoformat(), uid, mentee_std_id, mentee_name, mentor_data[0], mentor_data[1], mentor_data[2]))
         self.data[(int(mentee_std_id), mentee_name)] = (time, mentor_data[0], mentor_data[1], mentor_data[2])
         self.record.append((time.isoformat(), mentee_std_id, mentee_name, mentor_data[0], mentor_data[1], mentor_data[2]))
-        self.data_w.writerow((time.isoformat(), uid, mentee_std_id, mentee_name, mentor_data[0], mentor_data[1], mentor_data[2]))
 
     def get(self, mentee_std_id: int, mentee_name: str) -> Optional[tuple[datetime, int, str, str]]:
         try:
@@ -64,15 +59,12 @@ class Resource():
     mentee_data: dict[int, str]
     mentor_data: list[tuple[int, str, str]]
     current: list[tuple[int, str, str]]
-    state_f: TextIOWrapper
     log: logging.Logger
 
     def __init__(self) -> None:
         self.log = logging.getLogger("rpmsc.resource")
         self.mentee_data = {}
         self.mentor_data = []
-
-        self.state_f = open("state.txt", "r+", encoding="utf-8")
 
         for std_id, name, secret_code in csv.reader(open("mentor.csv", "r")):
             self.mentor_data.append((int(std_id), name, secret_code))
@@ -84,7 +76,7 @@ class Resource():
         self.log.info(f"Number of mentor : {len(self.mentor_data)}")
         self.current = self.mentor_data.copy()
 
-        for line in [x.replace("\n", "").strip() for x in reversed(self.state_f.readlines()) if x.replace("\n", "").strip() != ""]:
+        for line in [x.replace("\n", "").strip() for x in reversed(open("state.txt", "r", encoding="utf-8").readlines()) if x.replace("\n", "").strip() != ""]:
             if line == "REFILL": break
 
             std_id = int(line)
@@ -95,7 +87,8 @@ class Resource():
                     break
         else:
             self.log.info(f"Refill")
-            self.state_f.write("REFILL\n")
+            with open("state.txt", "a", encoding="utf-8") as f:
+                f.write("REFILL\n")
 
         self.log.info(f"Number of available in list : {len(self.current)}")
 
@@ -103,10 +96,12 @@ class Resource():
         async with lock:
             if len(self.current) == 0:
                 self.log.info(f"Refill")
-                self.state_f.write("REFILL\n")
+                with open("state.txt", "a", encoding="utf-8") as f:
+                    f.write("REFILL\n")
                 self.current = self.mentor_data.copy()
             item = self.current.pop(randint(0, len(self.current) - 1))
-            self.state_f.write(str(item[0]) + "\n")
+            with open("state.txt", "a", encoding="utf-8") as f:
+                f.write(str(item[0]) + "\n")
 
             return (item[0], item[1], item[2])
 
