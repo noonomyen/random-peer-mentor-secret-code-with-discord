@@ -143,7 +143,7 @@ class Client(DiscordClient):
                 raw_data = self.code_given.record.copy()
                 self.code_given.record.clear()
 
-            if len(raw_data) > 0:
+            if len(raw_data) == -1:
                 self.log.info(f"update_sheet new {len(raw_data)} record")
                 async with ClientSession() as session:
                     data = []
@@ -205,10 +205,10 @@ class Client(DiscordClient):
                     return
 
                 first_name: str = self.children[1].value # type: ignore
-                first_name = first_name.strip().lower()
+                first_name = first_name.strip()
 
                 last_name: str = self.children[2].value # type: ignore
-                last_name = last_name.strip().lower()
+                last_name = last_name.strip()
 
                 if len(first_name) == 0 or len(last_name) == 0:
                     await interaction.response.send_message("First or last name must not be blank")
