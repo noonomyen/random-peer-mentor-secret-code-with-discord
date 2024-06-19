@@ -10,8 +10,10 @@ import logging
 import logging.handlers
 import csv
 
+from aiohttp import ClientSession
 from dotenv import load_dotenv
 from discord import Intents, Interaction, Member, TextStyle, ui, app_commands, Client as DiscordClient, Activity, ActivityType, Message, RawMessageDeleteEvent
+from discord.ext import tasks
 
 load_dotenv()
 
@@ -25,10 +27,12 @@ class CodeGiven():
     log: logging.Logger
     data_f: TextIOWrapper
     data: dict[tuple[int, str], tuple[datetime, int, str, str]]
+    record: list[tuple[str, int, str, int, str, str]]
 
     def __init__(self) -> None:
         self.log = logging.getLogger("rpmsc.code-given")
         self.data = {}
+        self.record = []
 
         self.data_f = open("given.csv", "a+", newline="", encoding="utf-8")
         self.data_f.seek(0)
@@ -43,7 +47,8 @@ class CodeGiven():
     def set(self, uid: int, time: datetime, mentee_std_id: int, mentee_name: str, mentor_data: tuple[int, str, str]) -> None:
         self.log.info(f"Set Mentor of {mentee_std_id}:'{mentee_name}' is {mentor_data[0]}:'{mentor_data[1]}'")
         self.data[(int(mentee_std_id), mentee_name)] = (time, mentor_data[0], mentor_data[1], mentor_data[2])
-        self.data_w.writerow((time.isoformat(), uid, int(mentee_std_id), mentee_name, mentor_data[0], mentor_data[1], mentor_data[2]))
+        self.record.append((time.isoformat(), mentee_std_id, mentee_name, mentor_data[0], mentor_data[1], mentor_data[2]))
+        self.data_w.writerow((time.isoformat(), uid, mentee_std_id, mentee_name, mentor_data[0], mentor_data[1], mentor_data[2]))
 
     def get(self, mentee_std_id: int, mentee_name: str) -> Optional[tuple[datetime, int, str, str]]:
         try:
@@ -112,11 +117,12 @@ class Client(DiscordClient):
     log_on_raw_message_delete: logging.Logger
     guild_id: int
     code_given_channel_id: int
+    sheet_api_url: str
     resource: Resource
     code_given: CodeGiven
     command_tree: app_commands.CommandTree
 
-    def __init__(self, *, intents: Intents, guild_id: int, code_given_channel_id: int, **options: Any) -> None:
+    def __init__(self, *, intents: Intents, guild_id: int, code_given_channel_id: int, sheet_api_url: str, **options: Any) -> None:
         self.log = logging.getLogger("rpmcs.client")
         self.log_on_message = logging.getLogger("rpmcs.client.on_message")
         self.log_on_raw_message_delete = logging.getLogger("rpmcs.client.on_raw_message_delete")
@@ -125,11 +131,37 @@ class Client(DiscordClient):
 
         self.guild_id = guild_id
         self.code_given_channel_id = code_given_channel_id
+        self.sheet_api_url = sheet_api_url
         self.resource = Resource()
         self.code_given = CodeGiven()
         self.command_tree = app_commands.CommandTree(self)
 
         self.__load_command_tree()
+
+        @tasks.loop(seconds=30)
+        async def update_sheet() -> None:
+            async with lock:
+                raw_data = self.code_given.record.copy()
+                self.code_given.record.clear()
+
+            if len(raw_data) > 0:
+                self.log.info(f"update_sheet new {len(raw_data)} record")
+                async with ClientSession() as session:
+                    data = []
+                    for rec in raw_data:
+                        data.append({
+                            "time": rec[0],
+                            "mentee_std_id": rec[1],
+                            "mentee_name": rec[2],
+                            "mentor_std_id": rec[3],
+                            "mentor_name": rec[4],
+                            "message": rec[5]
+                        })
+                    res = await session.post(self.sheet_api_url, json=data)
+                    json = await res.json()
+                    self.log.info(f"update_sheet response {json.get('status')}")
+
+        self.update_sheet = update_sheet
 
     def __load_command_tree(self) -> None:
         client = self
@@ -187,8 +219,6 @@ class Client(DiscordClient):
                         else:
                             mentor_id, mentor_name, mentor_secret_code = await client.resource.get()
                             client.code_given.set(interaction.user.id, interaction.created_at, std_id, full_name, (mentor_id, mentor_name, mentor_secret_code))
-                            if interaction.guild:
-                                await interaction.guild.get_channel(client.code_given_channel_id).send(repr((interaction.user.id, interaction.created_at, std_id, full_name, (mentor_id, mentor_name, mentor_secret_code)))) # type: ignore
                             await interaction.response.send_message(f"**Your message is : **`{mentor_secret_code}`", ephemeral=True)
                     else:
                         await interaction.response.send_message(f"**Full name doesn't match**", ephemeral=True)
@@ -210,6 +240,7 @@ class Client(DiscordClient):
         )
 
         await self.command_tree.sync()
+        self.update_sheet.start()
 
     async def on_message(self, message: Message) -> None:
         if message.guild and message.guild.id == self.guild_id:
@@ -227,10 +258,11 @@ if __name__ == "__main__":
     bot_token = getenv("DISCORD_RPMSC_TOKEN")
     guild_id = getenv("LISTEN_GUILD_ID")
     code_given_channel_id = getenv("CODE_GIVEN_CHANNEL_ID")
+    sheet_api_url = getenv("SHEET_API_URL")
 
-    if bot_token is None or guild_id is None or code_given_channel_id is None:
-        print("DISCORD_RPMSC_TOKEN and LISTEN_GUILD_ID and CODE_GIVEN_CHANNEL_ID is required in env")
+    if bot_token is None or guild_id is None or code_given_channel_id is None or sheet_api_url is None:
+        print("DISCORD_RPMSC_TOKEN and LISTEN_GUILD_ID and CODE_GIVEN_CHANNEL_ID and SHEET_API_URL is required in env")
         exit(1)
 
-    client = Client(intents=Intents.all(), guild_id=int(guild_id), code_given_channel_id=int(code_given_channel_id), max_messages=None)
+    client = Client(intents=Intents.all(), guild_id=int(guild_id), code_given_channel_id=int(code_given_channel_id), sheet_api_url=sheet_api_url, max_messages=None)
     client.run(token=bot_token, reconnect=True, log_handler=log_handler)
