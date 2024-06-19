@@ -5,6 +5,10 @@ function res_json(obj) {
 }
 
 function doGet(e) {
+    if (e.parameter.token === SECRET_TOKEN) {
+        return res_json({ status: "ok" });
+    }
+
     return res_json({ status: "forbidden" });
 }
 
@@ -21,10 +25,10 @@ function doPost(e) {
                     typeof item.mentor_name === "string" &&
                     typeof item.message === "string"
                 ))) {
+                    const sheet = SpreadsheetApp.getActiveSheet();
                     data.forEach((item) => {
-                        const sheet = SpreadsheetApp.getActiveSheet();
                         sheet.appendRow([item.time, item.mentee_std_id, item.mentee_name, item.mentor_std_id, item.mentor_name, item.message]);
-                    })
+                    });
 
                     return res_json({ status: "ok" });
                 }
@@ -34,7 +38,7 @@ function doPost(e) {
 
             return res_json({ status: "forbidden" });
         }
-    } catch { } finally {
+    } catch (error) {
         return res_json({ status: "bad_request" });
     }
 }
