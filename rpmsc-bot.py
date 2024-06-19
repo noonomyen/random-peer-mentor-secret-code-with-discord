@@ -228,7 +228,7 @@ class Client(DiscordClient):
                         else:
                             mentor_id, mentor_name, mentor_secret_code = await client.resource.get()
                             client.code_given.set(interaction.user.id, interaction.created_at, std_id, full_name, (mentor_id, mentor_name, mentor_secret_code))
-                            await interaction.response.send_message(f"Your message is : `{mentor_secret_code}`", ephemeral=True)
+                            await interaction.response.send_message(f"Your message is\n```txt\n{mentor_secret_code}\n```", ephemeral=True)
                     else:
                         await interaction.response.send_message(f"Full name doesn't match", ephemeral=True)
                 else:
