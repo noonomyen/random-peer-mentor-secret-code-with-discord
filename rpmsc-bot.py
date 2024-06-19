@@ -137,7 +137,7 @@ class Client(DiscordClient):
                 raw_data = self.code_given.record.copy()
                 self.code_given.record.clear()
 
-            if len(raw_data) == -1:
+            if len(raw_data) > 0:
                 self.log.info(f"update_sheet new {len(raw_data)} record")
                 async with ClientSession() as session:
                     data = []
