@@ -2,7 +2,7 @@ from os import path, getenv
 from sys import exit
 from asyncio import Lock
 from typing import Any, Optional
-from random import shuffle
+from random import randint
 from datetime import datetime
 from io import TextIOWrapper
 
@@ -105,8 +105,7 @@ class Resource():
                 self.log.info(f"Refill")
                 self.state_f.write("REFILL\n")
                 self.current = self.mentor_data.copy()
-            shuffle(self.current)
-            item = self.current.pop(0)
+            item = self.current.pop(randint(0, len(self.current) - 1))
             self.state_f.write(str(item[0]) + "\n")
 
             return (item[0], item[1], item[2])
