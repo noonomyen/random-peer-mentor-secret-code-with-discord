@@ -181,6 +181,7 @@ class Client(DiscordClient):
 
                 self.add_item(ui.TextInput(
                     label="First name in without prefix name",
+                    min_length=1,
                     row=2,
                     required=True,
                     placeholder="ชื่อ",
@@ -189,6 +190,7 @@ class Client(DiscordClient):
 
                 self.add_item(ui.TextInput(
                     label="Last name in",
+                    min_length=1,
                     row=3,
                     required=True,
                     placeholder="นามสกุล",
@@ -203,7 +205,15 @@ class Client(DiscordClient):
                     return
 
                 first_name: str = self.children[1].value # type: ignore
+                first_name = first_name.strip().lower()
+
                 last_name: str = self.children[2].value # type: ignore
+                last_name = last_name.strip().lower()
+
+                if len(first_name) == 0 or len(last_name) == 0:
+                    await interaction.response.send_message("First or last name must not be blank")
+                    return
+
                 full_name = first_name + " " + last_name
 
                 if std_id in client.resource.mentee_data:
@@ -212,17 +222,17 @@ class Client(DiscordClient):
                             val = client.code_given.get(std_id, full_name)
                             if val:
                                 time, _0, _1, mentor_secret_code = val
-                                await interaction.response.send_message(f"**You have already chosen a random word**\n**Time: **{time}\n**Message: **`{mentor_secret_code}`", ephemeral=True)
+                                await interaction.response.send_message(f"You have already chosen a random word\nTime: {time}\n```txt\n{mentor_secret_code}\n```", ephemeral=True)
                             else:
-                                await interaction.response.send_message(f"You have already chosen a random word, but server is error, can't get data", ephemeral=True)
+                                await interaction.response.send_message(f"You have already chosen a random word, but server can't find data", ephemeral=True)
                         else:
                             mentor_id, mentor_name, mentor_secret_code = await client.resource.get()
                             client.code_given.set(interaction.user.id, interaction.created_at, std_id, full_name, (mentor_id, mentor_name, mentor_secret_code))
-                            await interaction.response.send_message(f"**Your message is : **`{mentor_secret_code}`", ephemeral=True)
+                            await interaction.response.send_message(f"Your message is : `{mentor_secret_code}`", ephemeral=True)
                     else:
-                        await interaction.response.send_message(f"**Full name doesn't match**", ephemeral=True)
+                        await interaction.response.send_message(f"Full name doesn't match", ephemeral=True)
                 else:
-                    await interaction.response.send_message(f"**Not found this student ID**", ephemeral=True)
+                    await interaction.response.send_message(f"Not found this student ID", ephemeral=True)
 
         @self.command_tree.command(name="give-code", description="Random secret or message code for peer mentee (freshy) to find peer mentor, good luck", guild=self.get_guild(self.guild_id))
         async def give_code(interaction: Interaction):
