@@ -108,8 +108,6 @@ class Resource():
 
 class Client(DiscordClient):
     log: logging.Logger
-    log_on_message: logging.Logger
-    log_on_raw_message_delete: logging.Logger
     guild_id: int
     code_given_channel_id: int
     sheet_api_url: str
@@ -119,8 +117,6 @@ class Client(DiscordClient):
 
     def __init__(self, *, intents: Intents, guild_id: int, sheet_api_url: str, **options: Any) -> None:
         self.log = logging.getLogger("rpmcs.client")
-        self.log_on_message = logging.getLogger("rpmcs.client.on_message")
-        self.log_on_raw_message_delete = logging.getLogger("rpmcs.client.on_raw_message_delete")
 
         super().__init__(intents=intents, **options)
 
@@ -245,14 +241,6 @@ class Client(DiscordClient):
 
         await self.command_tree.sync()
         self.update_sheet.start()
-
-    async def on_message(self, message: Message) -> None:
-        if message.guild and message.guild.id == self.guild_id:
-            self.log_on_message.info(str(message))
-
-    async def on_raw_message_delete(self, payload: RawMessageDeleteEvent) -> None:
-        if payload.guild_id == self.guild_id:
-            self.log_on_raw_message_delete.info(str(payload))
 
 if __name__ == "__main__":
     if not path.exists("mentor.csv"):
