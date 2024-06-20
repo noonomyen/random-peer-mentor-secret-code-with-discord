@@ -293,5 +293,5 @@ if __name__ == "__main__":
 
     log.info("Sheet API is OK")
 
-    client = Client(intents=Intents.all(), guild_id=int(guild_id), sheet_api_url=sheet_api_url, max_messages=None)
+    client = Client(intents=Intents.none(), guild_id=int(guild_id), sheet_api_url=sheet_api_url, max_messages=None)
     client.run(token=bot_token, reconnect=True, log_handler=log_handler)
