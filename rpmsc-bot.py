@@ -10,11 +10,12 @@ import logging.handlers
 import csv
 
 from aiohttp import ClientSession
+from requests import Session
 from dotenv import load_dotenv
 from discord import Intents, Interaction, Member, TextStyle, ui, app_commands, Client as DiscordClient, Activity, ActivityType, Message, RawMessageDeleteEvent
 from discord.ext import tasks
 
-load_dotenv()
+load_dotenv(override=True)
 
 lock = Lock()
 log_handler = logging.handlers.RotatingFileHandler(filename="rpmsc.log", encoding="utf-8")
@@ -255,7 +256,11 @@ class Client(DiscordClient):
 
 if __name__ == "__main__":
     if not path.exists("mentor.csv"):
-        print("not found mentor.csv file")
+        log.critical("Not found mentor.csv file")
+        exit(1)
+
+    if not path.exists("mentee.csv"):
+        log.critical("Not found mentee.csv file")
         exit(1)
 
     bot_token = getenv("DISCORD_RPMSC_TOKEN")
@@ -263,8 +268,30 @@ if __name__ == "__main__":
     sheet_api_url = getenv("SHEET_API_URL")
 
     if bot_token is None or guild_id is None or sheet_api_url is None:
-        print("DISCORD_RPMSC_TOKEN and LISTEN_GUILD_ID and and SHEET_API_URL is required in env")
+        log.critical("DISCORD_RPMSC_TOKEN and LISTEN_GUILD_ID and and SHEET_API_URL is required in env")
         exit(1)
+
+    try:
+        with Session() as session:
+            res = session.get(sheet_api_url, timeout=30)
+            if res.status_code == 200:
+                try:
+                    data = res.json()
+                    if data["status"] != "ok":
+                        raise Exception(f"Sheet API Error, Server return status = {data['status']}")
+                except Exception as err:
+                    log.critical(err)
+                    exit(1)
+            else:
+                log.critical(f"Sheet API Error, Server return status code is {res.status_code}")
+                exit(1)
+    except SystemExit as err:
+        exit(err.code)
+    except Exception as err:
+        log.critical("Sheet API, " + str(err))
+        exit(1)
+
+    log.info("Sheet API is OK")
 
     client = Client(intents=Intents.all(), guild_id=int(guild_id), sheet_api_url=sheet_api_url, max_messages=None)
     client.run(token=bot_token, reconnect=True, log_handler=log_handler)
