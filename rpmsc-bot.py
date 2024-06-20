@@ -12,7 +12,7 @@ import csv
 from aiohttp import ClientSession
 from requests import Session
 from dotenv import load_dotenv
-from discord import Intents, Interaction, Member, TextStyle, ui, app_commands, Client as DiscordClient, Activity, ActivityType, Message, RawMessageDeleteEvent
+from discord import Intents, Interaction, Member, TextStyle, ui, app_commands, Client as DiscordClient, Activity, ActivityType
 from discord.ext import tasks
 
 load_dotenv(override=True)
@@ -128,7 +128,7 @@ class Client(DiscordClient):
 
         self.__load_command_tree()
 
-        @tasks.loop(seconds=30)
+        @tasks.loop(seconds=30, count=None)
         async def update_sheet() -> None:
             async with lock:
                 raw_data = self.code_given.record.copy()
@@ -240,7 +240,10 @@ class Client(DiscordClient):
         )
 
         await self.command_tree.sync()
-        self.update_sheet.start()
+
+        if not self.update_sheet.is_running():
+            self.update_sheet.start()
+            self.log.info(f"Start task loop update_sheet")
 
 if __name__ == "__main__":
     if not path.exists("mentor.csv"):
