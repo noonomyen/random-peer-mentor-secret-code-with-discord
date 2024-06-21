@@ -201,16 +201,19 @@ class Client(DiscordClient):
                 ))
 
             async def on_submit(self, interaction: Interaction) -> None:
+                std_id_str = self.children[0].value # type: ignore
+                first_name: str = self.children[1].value # type: ignore
+                last_name: str = self.children[2].value # type: ignore
+
+                client.log.info(f"ask_modal:on_submit [{repr(std_id_str)}, {repr(first_name)}, {repr(last_name)}] interaction_id:{interaction.id} user_id:{interaction.user.id} guild_channel_id:{interaction.guild_id}:{interaction.channel_id}")
+
                 try:
-                    std_id: int = int(self.children[0].value) # type: ignore
+                    std_id: int = int(std_id_str) # type: ignore
                 except ValueError:
                     await interaction.response.send_message("Student ID is incorrect", ephemeral=True)
                     return
 
-                first_name: str = self.children[1].value # type: ignore
                 first_name = first_name.strip()
-
-                last_name: str = self.children[2].value # type: ignore
                 last_name = last_name.strip()
 
                 if len(first_name) == 0 or len(last_name) == 0:
@@ -240,6 +243,7 @@ class Client(DiscordClient):
         @self.command_tree.command(name="give-code", description="Random secret or message code for peer mentee (freshy) to find peer mentor, good luck", guild=self.get_guild(self.guild_id))
         async def give_code(interaction: Interaction):
             if interaction.guild_id == self.guild_id and isinstance(interaction.user, Member):
+                self.log.info(f"app_command:give-code interaction_id:{interaction.id} user_id:{interaction.user.id} guild_channel_id:{interaction.guild_id}:{interaction.channel_id}")
                 if interaction.created_at < client.start_time:
                     await interaction.response.send_message(f"The event will start <t:{int(client.start_time.timestamp())}:R>", ephemeral=True)
                 elif interaction.created_at > client.end_time:
