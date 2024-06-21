@@ -178,25 +178,22 @@ class Client(DiscordClient):
                     max_length=11,
                     row=1,
                     required=True,
-                    placeholder="67XXXXXXXXX",
                     style=TextStyle.short
                 ))
 
                 self.add_item(ui.TextInput(
-                    label="First name in without prefix name",
+                    label="First name in without prefix name (Include middle name)",
                     min_length=1,
                     row=2,
                     required=True,
-                    placeholder="ชื่อ",
                     style=TextStyle.short
                 ))
 
                 self.add_item(ui.TextInput(
-                    label="Last name in",
+                    label="Last name",
                     min_length=1,
                     row=3,
                     required=True,
-                    placeholder="นามสกุล",
                     style=TextStyle.short
                 ))
 
