@@ -112,6 +112,7 @@ class Client(DiscordClient):
     sheet_api_url: str
     start_time: datetime
     end_time: datetime
+    require_sync_app_command: bool
     tmp_given_record: list[tuple[str, int, str, int, str, str]]
 
     log: logging.Logger
@@ -120,7 +121,7 @@ class Client(DiscordClient):
     command_tree: app_commands.CommandTree
     task_update_sheet: tasks.Loop[Callable[[], Coroutine[Any, Any, None]]]
 
-    def __init__(self, *, intents: Intents, guild_id: int, sheet_api_url: str, start_end_time: tuple[datetime, datetime], **options: Any) -> None:
+    def __init__(self, *, intents: Intents, guild_id: int, sheet_api_url: str, start_end_time: tuple[datetime, datetime], require_sync_app_command = False, **options: Any) -> None:
         self.log = logging.getLogger("rpmcs.client")
 
         super().__init__(intents=intents, **options)
@@ -129,6 +130,7 @@ class Client(DiscordClient):
         self.sheet_api_url = sheet_api_url
         self.start_time, self.end_time = start_end_time
         self.tmp_given_record = []
+        self.require_sync_app_command = require_sync_app_command
         self.resource = Resource()
         self.code_given = CodeGiven()
         self.command_tree = app_commands.CommandTree(self)
@@ -259,7 +261,12 @@ class Client(DiscordClient):
             )
         )
 
-        await self.command_tree.sync()
+        if self.require_sync_app_command:
+            await self.command_tree.sync()
+            self.log.info("App command is synced")
+            open("app-command-synced", "w").write("")
+        else:
+            self.log.info("Skip app command sync")
 
         if not self.task_update_sheet.is_running():
             self.task_update_sheet.start()
@@ -279,6 +286,8 @@ if __name__ == "__main__":
     sheet_api_url = getenv("SHEET_API_URL")
     start_time = getenv("START")
     end_time = getenv("END")
+
+    require_sync_app_command = not path.exists("app-command-synced")
 
     if bot_token is None or guild_id is None or sheet_api_url is None or start_time is None or end_time is None:
         log.critical("DISCORD_RPMSC_TOKEN, LISTEN_GUILD_ID, SHEET_API_URL, START, END is required in env")
@@ -314,7 +323,8 @@ if __name__ == "__main__":
             datetime.fromisoformat(start_time),
             datetime.fromisoformat(end_time)
         ),
-        max_messages=None
+        max_messages=None,
+        require_sync_app_command=require_sync_app_command
     )
 
     client.run(token=bot_token, reconnect=True, log_handler=log_handler)
