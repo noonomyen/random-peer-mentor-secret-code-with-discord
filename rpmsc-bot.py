@@ -1,7 +1,7 @@
 from os import path, getenv
 from sys import exit
 from asyncio import Lock
-from typing import Any, Optional
+from typing import Any, Callable, Optional, Coroutine
 from random import randint
 from datetime import datetime
 
@@ -107,21 +107,28 @@ class Resource():
             return (item[0], item[1], item[2])
 
 class Client(DiscordClient):
-    log: logging.Logger
     guild_id: int
     code_given_channel_id: int
     sheet_api_url: str
+    start_time: datetime
+    end_time: datetime
+    tmp_given_record: list[tuple[str, int, str, int, str, str]]
+
+    log: logging.Logger
     resource: Resource
     code_given: CodeGiven
     command_tree: app_commands.CommandTree
+    task_update_sheet: tasks.Loop[Callable[[], Coroutine[Any, Any, None]]]
 
-    def __init__(self, *, intents: Intents, guild_id: int, sheet_api_url: str, **options: Any) -> None:
+    def __init__(self, *, intents: Intents, guild_id: int, sheet_api_url: str, start_end_time: tuple[datetime, datetime], **options: Any) -> None:
         self.log = logging.getLogger("rpmcs.client")
 
         super().__init__(intents=intents, **options)
 
         self.guild_id = guild_id
         self.sheet_api_url = sheet_api_url
+        self.start_time, self.end_time = start_end_time
+        self.tmp_given_record = []
         self.resource = Resource()
         self.code_given = CodeGiven()
         self.command_tree = app_commands.CommandTree(self)
@@ -129,16 +136,16 @@ class Client(DiscordClient):
         self.__load_command_tree()
 
         @tasks.loop(seconds=30, count=None)
-        async def update_sheet() -> None:
+        async def task_update_sheet() -> None:
             async with lock:
-                raw_data = self.code_given.record.copy()
+                self.tmp_given_record += self.code_given.record.copy()
                 self.code_given.record.clear()
 
-            if len(raw_data) > 0:
-                self.log.info(f"update_sheet new {len(raw_data)} record")
+            if len(self.tmp_given_record) > 0:
+                self.log.info(f"task_update_sheet new {len(self.tmp_given_record)} record")
                 async with ClientSession() as session:
                     data = []
-                    for rec in raw_data:
+                    for rec in self.tmp_given_record:
                         data.append({
                             "time": rec[0],
                             "mentee_std_id": rec[1],
@@ -149,9 +156,14 @@ class Client(DiscordClient):
                         })
                     res = await session.post(self.sheet_api_url, json=data)
                     json = await res.json()
-                    self.log.info(f"update_sheet response {json.get('status')}")
+                    if json["status"] == "ok":
+                        self.tmp_given_record.clear()
+                        self.log.info(f"task_update_sheet Response {json['status']}")
+                    else:
+                        self.log.critical(f"task_update_sheet Response {json['status']}")
+                        self.log.critical(f"task_update_sheet Failed to update data to sheet, number of record : {len(self.tmp_given_record)}")
 
-        self.update_sheet = update_sheet
+        self.task_update_sheet = task_update_sheet
 
     def __load_command_tree(self) -> None:
         client = self
@@ -192,7 +204,7 @@ class Client(DiscordClient):
                 try:
                     std_id: int = int(self.children[0].value) # type: ignore
                 except ValueError:
-                    await interaction.response.send_message("Student ID is incorrect")
+                    await interaction.response.send_message("Student ID is incorrect", ephemeral=True)
                     return
 
                 first_name: str = self.children[1].value # type: ignore
@@ -202,7 +214,7 @@ class Client(DiscordClient):
                 last_name = last_name.strip()
 
                 if len(first_name) == 0 or len(last_name) == 0:
-                    await interaction.response.send_message("First or last name must not be blank")
+                    await interaction.response.send_message("First or last name must not be blank", ephemeral=True)
                     return
 
                 full_name = first_name + " " + last_name
@@ -228,7 +240,14 @@ class Client(DiscordClient):
         @self.command_tree.command(name="give-code", description="Random secret or message code for peer mentee (freshy) to find peer mentor, good luck", guild=self.get_guild(self.guild_id))
         async def give_code(interaction: Interaction):
             if interaction.guild_id == self.guild_id and isinstance(interaction.user, Member):
-                await interaction.response.send_modal(ask_modal())
+                if interaction.created_at < client.start_time:
+                    await interaction.response.send_message(f"The event will start <t:{int(client.start_time.timestamp())}:R>", ephemeral=True)
+                elif interaction.created_at > client.end_time:
+                    await interaction.response.send_message(f"Activity ended <t:{int(client.end_time.timestamp())}:R>", ephemeral=True)
+                else:
+                    await interaction.response.send_modal(ask_modal())
+            else:
+                await interaction.response.send_message("This command is not allowed from outside", ephemeral=True)
 
     async def on_ready(self) -> None:
         self.log.info(f"Logged in as {self.user}")
@@ -241,9 +260,9 @@ class Client(DiscordClient):
 
         await self.command_tree.sync()
 
-        if not self.update_sheet.is_running():
-            self.update_sheet.start()
-            self.log.info(f"Start task loop update_sheet")
+        if not self.task_update_sheet.is_running():
+            self.task_update_sheet.start()
+            self.log.info(f"Start task loop task_update_sheet")
 
 if __name__ == "__main__":
     if not path.exists("mentor.csv"):
@@ -257,9 +276,11 @@ if __name__ == "__main__":
     bot_token = getenv("DISCORD_RPMSC_TOKEN")
     guild_id = getenv("LISTEN_GUILD_ID")
     sheet_api_url = getenv("SHEET_API_URL")
+    start_time = getenv("START")
+    end_time = getenv("END")
 
-    if bot_token is None or guild_id is None or sheet_api_url is None:
-        log.critical("DISCORD_RPMSC_TOKEN and LISTEN_GUILD_ID and and SHEET_API_URL is required in env")
+    if bot_token is None or guild_id is None or sheet_api_url is None or start_time is None or end_time is None:
+        log.critical("DISCORD_RPMSC_TOKEN, LISTEN_GUILD_ID, SHEET_API_URL, START, END is required in env")
         exit(1)
 
     try:
@@ -284,5 +305,15 @@ if __name__ == "__main__":
 
     log.info("Sheet API is OK")
 
-    client = Client(intents=Intents.none(), guild_id=int(guild_id), sheet_api_url=sheet_api_url, max_messages=None)
+    client = Client(
+        intents=Intents.none(),
+        guild_id=int(guild_id),
+        sheet_api_url=sheet_api_url,
+        start_end_time=(
+            datetime.fromisoformat(start_time),
+            datetime.fromisoformat(end_time)
+        ),
+        max_messages=None
+    )
+
     client.run(token=bot_token, reconnect=True, log_handler=log_handler)
