@@ -15,6 +15,7 @@ This code is a discord bot for user to use app commands (slash commands) and pop
 - `state.txt` (auto) save state of random list
 - `given.csv` (auto) random log
 - `rpmsc.log` (auto) logging file
+- `app-command-synced` (auto) exists if app command synced
 
 ## Setup
 
