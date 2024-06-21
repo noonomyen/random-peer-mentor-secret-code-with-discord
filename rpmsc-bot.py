@@ -182,7 +182,7 @@ class Client(DiscordClient):
                 ))
 
                 self.add_item(ui.TextInput(
-                    label="First name in without prefix name (Include middle name)",
+                    label="First + middle name without prefix name",
                     min_length=1,
                     row=2,
                     required=True,
