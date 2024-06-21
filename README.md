@@ -36,5 +36,7 @@ python ./rpmsc-bot.py
 ```txt
 DISCORD_RPMSC_TOKEN=
 LISTEN_GUILD_ID=
-SHEET_API_URL=
+SHEET_API_URL=https://script.google.com/...?token=...
+START=YYYY-MM-DDThh:mm:ss.000000+00:00
+END=YYYY-MM-DDThh:mm:ss.000000+00:00
 ```
